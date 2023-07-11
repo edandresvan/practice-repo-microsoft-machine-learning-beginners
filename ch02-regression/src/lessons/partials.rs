@@ -1,8 +1,20 @@
 use linear_regression::application_error::GenericResult;
-use maud::{Markup, html, DOCTYPE, PreEscaped};
+use maud::{html, Markup, PreEscaped, DOCTYPE};
 
-
-pub fn create_html_page(page_title: &str, article: Markup) -> GenericResult<Markup> {
+/// Create an HTML page using the Maud library.
+/// 
+/// # Arguments
+/// 
+/// * `page_title`: Title of the page
+/// * `article`: HTML article object containing the elements to show in the page.
+/// 
+/// # Returns
+/// 
+/// A result containing the HTML page.
+pub fn create_html_page(
+  page_title: &str,
+  article: Markup,
+) -> GenericResult<Markup> {
   let page = html!({
     (DOCTYPE)
     head {
@@ -13,10 +25,7 @@ pub fn create_html_page(page_title: &str, article: Markup) -> GenericResult<Mark
     }
     body {
       (article)
-
-      
     }
-
   });
 
   Ok(page)

@@ -314,3 +314,18 @@ span.null-value {
 .dataframe-table td.datetime-value {
   text-align: right;
 }
+
+.plot-figure {
+  position: relative;
+  margin: 1em 0;
+  display: block;
+  padding: 1em;
+  border: 2px solid var(--color-2);
+}
+
+.plot-figure-caption {
+  background-color: transparent;
+  color: inherit;
+  padding: 2px;
+  text-align: center;
+}
