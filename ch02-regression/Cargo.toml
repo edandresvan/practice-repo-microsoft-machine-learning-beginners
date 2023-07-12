@@ -18,6 +18,7 @@ polars = { version = "~0.30.0", features = [
   "describe",
   "random",
   "temporal",
+  "timezones",
   "dtype-decimal",
   "horizontal_concat",
   "concat_str",

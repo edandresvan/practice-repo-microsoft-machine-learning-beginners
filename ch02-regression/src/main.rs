@@ -1,6 +1,8 @@
 use actix_web::{App, HttpServer};
 use mimalloc::MiMalloc;
 
+
+
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
@@ -8,6 +10,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 mod lessons;
 
 use lessons::routes::lesson_routes;
+
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

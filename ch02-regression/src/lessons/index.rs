@@ -1,11 +1,12 @@
+use linear_regression::partials::create_html_page;
 use actix_web::HttpResponse;
 use linear_regression::application_error::ApplicationError;
-use maud::html;
-
-use super::partials::create_html_page;
+use maud::{html, PreEscaped};
 
 pub async fn get_index() -> Result<HttpResponse, ApplicationError> {
-  let article = html!({
+  let mut page_elements: Vec<PreEscaped<String>> = Vec::new();
+
+  page_elements.push(html!({
 
     article {
       h1 { "Lessons" }
@@ -15,9 +16,10 @@ pub async fn get_index() -> Result<HttpResponse, ApplicationError> {
       }
     }
 
-  });
+  }));
 
-  let page = create_html_page("Index of Notebooks", article)?;
-
-  Ok(HttpResponse::Ok().body(page.into_string()))
+  Ok(
+    HttpResponse::Ok()
+      .body(create_html_page("Index of Notebooks", page_elements)?.into_string()),
+  )
 }

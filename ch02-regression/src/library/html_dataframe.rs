@@ -6,10 +6,7 @@ use polars::{
   series::Series,
 };
 
-use crate::{
-  application_error::GenericResult,
-  sample_options::SampleOptions,
-};
+use crate::{application_error::GenericResult, sample_options::SampleOptions};
 
 /// Displays the given dataframe object as a HTML table.
 ///
@@ -38,12 +35,12 @@ pub fn html_dataframe(
   }
 
   // Obtain a set of rows depending on the sample size and suffle options provided to this function
-  let df_sample = match options.clone() {
+  let df_sample = match options {
     // If no options were provided, the user wants to display the entire dataframe.
     None => df.clone(),
     // If options were provided, then the user wants to display a subset of the dataframe rows.
     Some(_) => {
-      if df_options.shuffle == false {
+      if !df_options.shuffle  {
         // The user wants a sample of rows in sequential order, so get an slice from the dataset
         df.slice(0, df_options.sample_size)
       } else {
@@ -57,7 +54,7 @@ pub fn html_dataframe(
     div .tblcon {
     table .dataframe-table {
       // Show a caption with metadata about the dataframe
-      caption { ( format!("Dataframe info: rows: {0}, columns: {1}. Showing: {2} rows. Suffle: {3}", df.height(), df.width(), df_options.sample_size , (if df_options.shuffle == true { "Yes"} else { "No "}) ) ) }
+      caption { ( format!("Dataframe info: rows: {0}, columns: {1}. Showing: {2} rows. Suffle: {3}", df.height(), df.width(), df_options.sample_size , (if df_options.shuffle { "Yes"} else { "No "}) ) ) }
 
       // Display the table headers containing two rows:
       // - Field name
@@ -133,13 +130,11 @@ fn format_series_value(
       } else {
         value
       }
-    },
+    }
     AnyValue::Float32(value) => Cow::Owned(format!("{:.3}", value)),
     AnyValue::Float64(value) => Cow::Owned(format!("{:.3}", value)),
     AnyValue::Decimal(value, _size) => Cow::Owned(format!("{:.3}", value)),
-    AnyValue::Null => {
-      Cow::Borrowed("<span class=\"null-value\">null</span>")
-    },
+    AnyValue::Null => Cow::Borrowed("<span class=\"null-value\">null</span>"),
     #[cfg(feature = "dtype-categorical")]
     AnyValue::Categorical(idx, rev, arr) => {
       if arr.is_null() {
