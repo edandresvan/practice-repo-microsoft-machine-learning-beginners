@@ -1,8 +1,10 @@
 [build]
 
 [target.x86_64-unknown-linux-gnu]
+#rustflags = ["-A", "non_snake_case", "-A", "mixed_script_confusables"]
 #linker = "clang"
 #rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
 linker = "clang-16"
-rustflags = ["-C", "link-arg=-fuse-ld=lld-16", "--verbose"]
-#rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+#rustflags = ["-C", "link-arg=-fuse-ld=lld-16", "-A", "mixed_script_confusables"]
+rustflags = ["-C", "link-arg=-fuse-ld=mold", "-A", "mixed_script_confusables"]

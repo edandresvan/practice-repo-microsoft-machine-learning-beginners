@@ -12,16 +12,17 @@ use crate::application_error::GenericResult;
 /// * `caption`: Caption text of the figure.
 pub fn html_plot_figure(
   traces: Vec<Box<dyn Trace>>,
-  layout: Layout,
+  layout: &Layout,
   caption: &str,
 ) -> GenericResult<Markup> {
   let mut plot = Plot::new();
+  plot.set_configuration(plot.configuration().clone().responsive(true));
   plot.add_traces(traces);
-  plot.set_layout(layout);
+  plot.set_layout(layout.clone().auto_size(true));
 
   Ok(html! {
     figure .plot-figure {
-      ( PreEscaped(plot.to_inline_html(None)) )
+      div .embeded-plot { ( PreEscaped(plot.to_inline_html(None)) ) }
       figcaption .plot-figure-caption { (format!("{}", caption)) }
     }
 

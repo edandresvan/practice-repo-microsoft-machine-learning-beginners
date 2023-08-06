@@ -122,7 +122,7 @@ pub async fn get_lesson_2() -> GenericResult<HttpResponse> {
     .y_axis(Axis::new().title(Title::new("Price")));
 
   article_elements.push(html! {
-    ( html_plot_figure(traces, layout, "Scatter plot for the pumpkins.")? ) 
+    ( html_plot_figure(traces, &layout, "Scatter plot for the pumpkins.")? ) 
   });
 
   // Add a Bar Plot
@@ -140,7 +140,7 @@ pub async fn get_lesson_2() -> GenericResult<HttpResponse> {
     .y_axis(Axis::new().title(Title::new("Price")));
 
   article_elements.push(html! {
-    ( html_plot_figure(traces, layout, "Bar plot for the pumpkins.")? ) 
+    ( html_plot_figure(traces, &layout, "Bar plot for the pumpkins.")? ) 
   });
 
   Ok(HttpResponse::Ok().body(create_html_notebook("Lesson 2: Preparing Source Data", article_elements)?.into_string()))

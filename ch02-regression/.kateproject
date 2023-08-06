@@ -1,0 +1,9 @@
+{
+  "name": "ch02-regression",
+  "files": [
+    {
+      "git": 1,
+	  "recursive": 1
+    }
+  ]
+}

@@ -253,9 +253,6 @@ thead {
   border: 1px solid var(--color-2);
 }
 
-.dataframe-table thead {
-  /* display: none; */
-}
 
 .dataframe-table thead tr,
 .dataframe-table tbody tr {
@@ -321,6 +318,7 @@ span.null-value {
   display: block;
   padding: 1em;
   border: 2px solid var(--color-2);
+  width: 40%;
 }
 
 .plot-figure-caption {
@@ -328,4 +326,8 @@ span.null-value {
   color: inherit;
   padding: 2px;
   text-align: center;
+}
+
+.embeded-plot {
+  width: 100%;
 }
