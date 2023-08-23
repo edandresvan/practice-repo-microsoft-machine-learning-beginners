@@ -1,4 +1,5 @@
-use actix_web::HttpResponse;
+
+use axum::{response::IntoResponse, http::StatusCode};
 use linear_regression::{
   application_error::GenericResult, html_dataframe::html_dataframe,
   html_plot_figure::html_plot_figure, sample_options::SampleOptions,
@@ -10,7 +11,7 @@ use linear_regression::partials::create_html_notebook;
 
 /// Gets the notebook for the lesson 2 Preparing Data.
 /// 
-pub async fn get_lesson_2() -> GenericResult<HttpResponse> {
+pub async fn get_lesson_2() -> GenericResult<impl IntoResponse> {
   // List containing the sections and elements of a HTML article fof data analysis.
   let mut article_elements: Vec<PreEscaped<String>> = Vec::new();
 
@@ -45,6 +46,7 @@ pub async fn get_lesson_2() -> GenericResult<HttpResponse> {
     strict: true,
     exact: true,
     cache: true,
+    use_earliest: Some(true),
   };
 
   // Ensure the date attribute (column) is a date properly.
@@ -126,7 +128,7 @@ pub async fn get_lesson_2() -> GenericResult<HttpResponse> {
   });
 
   // Add a Bar Plot
-  let pumpkins = pumpkins.lazy().groupby(["Month"]).agg([col("Price").median()]).sort("Month", SortOptions { descending: false, nulls_last: true, multithreaded: true }).collect()?;
+  let pumpkins = pumpkins.lazy().groupby(["Month"]).agg([col("Price").median()]).sort("Month", SortOptions { descending: false, nulls_last: true, maintain_order: true, multithreaded: true }).collect()?;
 
   let prices = pumpkins["Price"].f64()?.into_iter().collect();
   let months = pumpkins["Month"].u32()?.into_iter().collect();
@@ -143,5 +145,5 @@ pub async fn get_lesson_2() -> GenericResult<HttpResponse> {
     ( html_plot_figure(traces, &layout, "Bar plot for the pumpkins.")? ) 
   });
 
-  Ok(HttpResponse::Ok().body(create_html_notebook("Lesson 2: Preparing Source Data", article_elements)?.into_string()))
+  Ok((StatusCode::OK, create_html_notebook("Lesson 2: Preparing Source Data", article_elements)?).into_response())
 }

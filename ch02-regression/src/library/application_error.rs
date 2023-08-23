@@ -1,5 +1,7 @@
 //  GenericError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
+use axum::{http::StatusCode, response::IntoResponse};
+
 /// Represents a generic result for the system.
 pub type GenericResult<T> = Result<T, ApplicationError>;
 
@@ -147,48 +149,48 @@ impl From<GenericError> for ApplicationError {
   }
 }
 
-impl ApplicationError {
-  /// Sends a user-friendly text message to inform that an error has ocurred.
-  fn error_response(&self) -> String {
-    self.to_string()
-  }
-}
 
-impl actix_web::error::ResponseError for ApplicationError {
-  fn status_code(&self) -> actix_web::http::StatusCode {
-    // Specify the HTTP status code for the response message.
-    match self {
-      ApplicationError::PolarsError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+impl IntoResponse for ApplicationError {
+  fn into_response(self) -> axum::response::Response {
+    let (status, error_message) = match self {
+      ApplicationError::PolarsError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-      ApplicationError::ParseIntError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+      ApplicationError::ParseIntError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-      ApplicationError::IOError(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-      ApplicationError::EnvVarError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+      ApplicationError::IOError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-      ApplicationError::CSVError(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-      ApplicationError::LinfaError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+      ApplicationError::EnvVarError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-      ApplicationError::LinfaLinearError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+      ApplicationError::CSVError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-      ApplicationError::NDArrayShapeError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+      ApplicationError::LinfaError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-      ApplicationError::SmartCoreError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+      ApplicationError::LinfaLinearError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-      ApplicationError::GenericError(_) => {
-        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+      ApplicationError::NDArrayShapeError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
       }
-    }
-  }
+      ApplicationError::SmartCoreError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+      }
+      ApplicationError::GenericError(err) => {
+        (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+      }
+    };
 
-  fn error_response(&self) -> actix_web::HttpResponse<actix_web::body::BoxBody> {
-    // Build the body for the response using the status code and the error message.
-    actix_web::HttpResponse::build(self.status_code()).body(self.error_response())
+    //   let body = axum::Json(serde_json::json!({
+    //     "error": error_message,
+    // }));
+
+    let body = axum::response::Html(error_message);
+
+    (status, body).into_response()
   }
 }

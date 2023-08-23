@@ -6,10 +6,6 @@ use ndarray::s;
 use ndarray::Array;
 use ndarray::Array2;
 use ndarray::Ix2;
-use polars::export::arrow::temporal_conversions::date32_to_date;
-use polars::prelude::ListPrimitiveChunkedBuilder;
-
-use crate::application_error::GenericResult;
 
 /// Represents a model for a regression.
 pub struct RegressionModel {
@@ -163,7 +159,7 @@ impl RegressionModel {
   ) -> f64 {
     let e = self.e(x, y);
     let m = e.clone().reversed_axes().dot(&e);
-    (m.get((0, 0)).unwrap() / (x.nrows() as f64))
+    m.get((0, 0)).unwrap() / (x.nrows() as f64)
   }
 
   /// Predicts a vector of response (output) variables given a matrix of explanatory (input) variables.

@@ -1,9 +1,8 @@
-use linear_regression::partials::create_html_page;
-use actix_web::HttpResponse;
-use linear_regression::application_error::ApplicationError;
+use axum::{http::StatusCode, response::IntoResponse};
+use linear_regression::{application_error::GenericResult, partials::create_html_page};
 use maud::{html, PreEscaped};
 
-pub async fn get_index() -> Result<HttpResponse, ApplicationError> {
+pub async fn get_index() -> GenericResult<impl IntoResponse> {
   let mut page_elements: Vec<PreEscaped<String>> = Vec::new();
 
   page_elements.push(html!({
@@ -19,7 +18,10 @@ pub async fn get_index() -> Result<HttpResponse, ApplicationError> {
   }));
 
   Ok(
-    HttpResponse::Ok()
-      .body(create_html_page("Index of Notebooks", page_elements)?.into_string()),
+    (
+      StatusCode::OK,
+      create_html_page("Index of Notebooks", page_elements)?,
+    )
+      .into_response(),
   )
 }

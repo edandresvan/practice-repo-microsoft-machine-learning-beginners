@@ -1,4 +1,5 @@
-use actix_web::HttpResponse;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use linear_regression::application_error::GenericResult;
 use linear_regression::html_dataframe::html_dataframe;
 use linear_regression::html_plot_figure::html_plot_figure;
@@ -14,14 +15,13 @@ use plotly::Scatter;
 use plotly::Trace;
 use plotly::{Bar, Layout};
 use polars::export::chrono::*;
-use polars::functions::hor_concat_df;
 use polars::prelude::*;
 use polars::prelude::{CsvReader, DataFrame, SerReader};
 use std::collections::HashMap;
 
 /// Gets the notebook for the lesson 3 Linear Regression
 ///
-pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
+pub async fn get_lesson_3() -> GenericResult<impl IntoResponse> {
   // List containing the sections and elements of a HTML article fof data analysis.
   let mut article_elements: Vec<PreEscaped<String>> = Vec::new();
 
@@ -56,6 +56,7 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
     strict: true,
     exact: true,
     cache: true,
+    use_earliest: Some(true),
   };
 
   // Transform into proper date datatype.
@@ -317,6 +318,7 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
     .collect()?;
 
   article_elements.push(html! {
+    h2 { "Linear Regression" }
     h3 { "Data for the Linear Regression" }
     ( html_dataframe(&pie_pumpkins, Some( SampleOptions::builder().sample_size(12).shuffle(true).build() ) )? )
   });
@@ -328,19 +330,19 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
     .lazy()
     .select([col("DayOfYear")])
     .collect()?
-    .to_ndarray::<Float64Type>()?;
+    .to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
 
   // The shape will be [n, 1]
   let y_values = pie_pumpkins
     .lazy()
     .select([col("Price")])
     .collect()?
-    .to_ndarray::<Float64Type>()?;
+    .to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
 
-  let mut col_parameters = "Parameters (β)";
+  let col_parameters = "Parameters (β)";
   let col_r2 = "Coef Determination\n(r²)";
   let col_mse = "Mean Squared Error\n(MSE)";
-  let col_rss = Series::new_empty("RSS", &DataType::Float64);
+  // let col_rss = Series::new_empty("RSS", &DataType::Float64);
   let col_mean_error = "Mean Error";
   let col_library = "Regression Library";
 
@@ -354,7 +356,6 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
 
   // Linear Regression Using Linfa
   {
-    use linfa::prelude::SingleTargetRegression;
     use linfa::prelude::*;
     use linfa_linear::LinearRegression;
     use ndarray::s;
@@ -371,30 +372,17 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
 
     let model = LinearRegression::new().fit(&dataset_train)?;
 
-    let correlation_coefficients: Vec<f64> = model.params().iter().map(|v| *v).collect();
+    // copied() replaces map(|v| *v)
+    let correlation_coefficients: Vec<f64> = model.params().iter().copied().collect();
     let line_intercept = model.intercept();
 
-    let predictions = model.predict(&dataset_test);
+    let predictions: Array1<f64> = model.predict(&dataset_test);
 
     let mse = predictions.mean_squared_error(&dataset_test.targets())?;
 
     let mean_error = f64::sqrt(predictions.mean_squared_error(&dataset_test.targets())?);
 
-    let rss_tmp = predictions.mean_squared_error(&dataset_test.targets())?
-      * dataset_test.ntargets() as f64;
-
-    let mean_error_percentage = (mean_error / predictions.mean().unwrap()) * 100.0;
-
-    let score = predictions.r2(dataset_test.targets())?;
-
-    article_elements.push(html! {
-      h3 { "Linear Regression using Linfa" }
-      p { ( format!("Parameters: {:.8?}", correlation_coefficients) ) }
-      p { (format!("Line intercept: {:.3?}", line_intercept)) }
-      p { (format!("Mean error: {0:.3} ({1:.3} %)", mean_error, mean_error_percentage )) }
-      p { (format!("Score (also called R2 or Determination Coefficient): {:.8}", score )) }
-      p { (format!("RSS: {:.8}", rss_tmp )) }
-    });
+    let score = predictions.r2(&dataset_test.targets())?;
 
     let linfa_results_df = DataFrame::new(vec![
       Series::new(col_library, &["Linfa"]),
@@ -417,13 +405,39 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
     ])?;
 
     regression_results_df.vstack_mut(&linfa_results_df)?;
+
+    // Draw the linear regression model
+    article_elements.push(html!( {
+      h3 { "Linear Regression with Linfa" }
+    }));
+
+    let days_of_year: Vec<f64> = dataset_test
+      .records()
+      .column(0)
+      .into_iter()
+      .copied()
+      .collect();
+    let prices = dataset_test.targets().into_iter().copied().collect();
+    let predicted_prices = predictions.into_raw_vec();
+
+    let scatter_trace =
+      Scatter::new(days_of_year.clone(), prices).mode(plotly::common::Mode::Markers);
+    let line_trace = Scatter::new(days_of_year.clone(), predicted_prices)
+      .mode(plotly::common::Mode::Lines)
+      .name("Lines");
+
+    let traces: Vec<Box<dyn Trace>> = vec![scatter_trace, line_trace];
+    let layout = Layout::new()
+      .title(Title::new("Price vs Day of Year"))
+      .x_axis(Axis::new().title(Title::new("Day of Year")))
+      .y_axis(Axis::new().title(Title::new("Price")));
+    article_elements.push(html! {
+    (html_plot_figure(traces, &layout, "Scatter plot price vs day of year.")?)
+    });
   }
   // Linear Regression using Smartcore
   {
-    use ndarray::Array;
-    use smartcore::linalg::traits::stats::MatrixStats;
     use smartcore::linear::linear_regression::*;
-    use smartcore::metrics::accuracy::Accuracy;
     use smartcore::metrics::mean_squared_error;
     use smartcore::metrics::r2::R2;
     use smartcore::metrics::Metrics;
@@ -436,36 +450,18 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
     let model =
       LinearRegression::fit(&x_train, &y_train, LinearRegressionParameters::default())?;
 
+    // copied() replaces map(|v| *v)
     let correlation_coefficients: Vec<f64> =
-      model.coefficients().iter().map(|v| *v).collect();
+      model.coefficients().iter().copied().collect();
     let line_intercept = *model.intercept();
 
     let predictions = model.predict(&x_test)?;
-    let predictions_mean =
-      Array::from_shape_vec((predictions.len(), 1), predictions.clone())?.mean();
 
     let mse = mean_squared_error(&y_test, &predictions);
 
     let mean_error = f64::sqrt(mean_squared_error(&y_test, &predictions));
 
-    let rss_tmp = mean_squared_error(&y_test, &predictions) * y_test.len() as f64;
-
-    let mean_error_percentage = (mean_error / predictions_mean.unwrap()) * 100.0;
-
     let score = R2::new().get_score(&y_test.to_vec(), &predictions.to_vec());
-
-    let accuracy_w = Accuracy::new().get_score(&y_test, &predictions);
-
-    article_elements.push(html! {
-      h3 { "Linear Regression using SmartCore" }
-      p { ( format!("Parameters: {:.8?}", correlation_coefficients) ) }
-      p { (format!("Line intercept: {:.3?}", line_intercept)) }
-      p { (format!("Mean error: {0:.3} ({1:.3} %)", mean_error, mean_error_percentage )) }
-      p { (format!("Score (also called R2 or Determination Coefficient):
-    {:.8}", score )) }
-      p { (format!("Accuracy: {:.8}", accuracy_w )) }
-      p { (format!("RSS: {:.8}", rss_tmp )) }
-    });
 
     let smartcore_results_df = DataFrame::new(vec![
       Series::new(col_library, &["SmartCore"]),
@@ -482,12 +478,37 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
         &[format!(
           "{:.3} ({:.3} %)",
           mean_error,
-          mean_error / Array1::from_vec(predictions).mean().unwrap_or(0.0) * 100.0
+          mean_error / Array1::from_vec(predictions.clone()).mean().unwrap_or(0.0)
+            * 100.0
         )],
       ),
     ])?;
 
     regression_results_df.vstack_mut(&smartcore_results_df)?;
+
+    // Draw the linear regression model
+    article_elements.push(html!( {
+      h3 { "Linear Regression with SmartCore" }
+    }));
+
+    let days_of_year: Vec<f64> = x_test.column(0).into_iter().copied().collect();
+    let prices = y_test;
+    let predicted_prices = predictions;
+
+    let scatter_trace =
+      Scatter::new(days_of_year.clone(), prices).mode(plotly::common::Mode::Markers);
+    let line_trace = Scatter::new(days_of_year.clone(), predicted_prices)
+      .mode(plotly::common::Mode::Lines)
+      .name("Lines");
+
+    let traces: Vec<Box<dyn Trace>> = vec![scatter_trace, line_trace];
+    let layout = Layout::new()
+      .title(Title::new("Price vs Day of Year"))
+      .x_axis(Axis::new().title(Title::new("Day of Year")))
+      .y_axis(Axis::new().title(Title::new("Price")));
+    article_elements.push(html! {
+    (html_plot_figure(traces, &layout, "Scatter plot price vs day of year.")?)
+    });
   }
 
   // Linear Regression using Matrix Math
@@ -501,29 +522,6 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
   let mean_error: f64 = mse.sqrt();
 
   let predictions = model.predict(&model.x_test);
-
-  article_elements.push(html! {
-    h2 { "Linear Regression using Matrix Math" }
-    p { (format!("x = {:?}", &x_values )) }
-    p { "" }
-    p { (format!("y = {:?}", &y_values )) }
-    p { (format!("x_train = {:?}", model.x_train )) }
-    p { (format!("x_test = {:?}", model.x_test )) }
-    p { (format!("y_train = {:?}", model.y_train )) }
-    p { (format!("y_test = {:?}", model.y_test )) }
-
-    p { (format!("β = {:?}", model.β )) }
-    p { (format!("y_predict = {:?}", model.predict(&model.x_test) )) }
-    p { (format!("r2 = {:?}", model.r2(&model.x_test, &model.y_test) )) }
-
-    p { (format!("e = {:?}", model.e(&model.x_test, &model.y_test) )) }
-    p { (format!("RSE = {:?}", model.rse(&model.x_test, &model.y_test) )) }
-    p { (format!("RSS = {:?}", model.rss(&model.x_test, &model.y_test) )) }
-    p { (format!("δ2 = {:?}", model.δ2(&model.x_test, &model.y_test) )) }
-    p { (format!("MSE = {:?}", model.mse(&model.x_test, &model.y_test) )) }
-
-
-  });
 
   let matrix_math_results_df = DataFrame::new(vec![
     Series::new(col_library, &["Matrix Math"]),
@@ -545,12 +543,41 @@ pub async fn get_lesson_3() -> GenericResult<HttpResponse> {
 
   regression_results_df.vstack_mut(&matrix_math_results_df)?;
 
+  // Draw the linear regression model
+  article_elements.push(html!( {
+    h3 { "Linear Regression with Matrix Math" }
+  }));
+
+  // The days of year are in the column 1, because it is an expansion matrix X = [1, x].
+  let days_of_year: Vec<f64> = model.x_test.column(1).into_iter().copied().collect();
+  let prices: Vec<f64> = model.y_test.column(0).into_iter().copied().collect();
+  let predicted_prices: Vec<f64> = predictions.column(0).into_iter().copied().collect();
+
+  let scatter_trace =
+    Scatter::new(days_of_year.clone(), prices).mode(plotly::common::Mode::Markers);
+  let line_trace = Scatter::new(days_of_year.clone(), predicted_prices)
+    .mode(plotly::common::Mode::Lines)
+    .name("Lines");
+
+  let traces: Vec<Box<dyn Trace>> = vec![scatter_trace, line_trace];
+  let layout = Layout::new()
+    .title(Title::new("Price vs Day of Year"))
+    .x_axis(Axis::new().title(Title::new("Day of Year")))
+    .y_axis(Axis::new().title(Title::new("Price")));
   article_elements.push(html! {
-    h3 { "Linear Regression results" }
+  (html_plot_figure(traces, &layout, "Scatter plot price vs day of year.")?)
+  });
+
+  article_elements.push(html! {
+    h3 { "Linear Regression Results" }
     ( html_dataframe(&regression_results_df, None)?  )
   });
 
-  Ok(HttpResponse::Ok().body(
-    create_html_notebook("Lesson 3: Linear Regression", article_elements)?.into_string(),
-  ))
+  Ok(
+    (
+      StatusCode::OK,
+      create_html_notebook("Lesson 3: Linear Regression", article_elements)?,
+    )
+      .into_response(),
+  )
 }
